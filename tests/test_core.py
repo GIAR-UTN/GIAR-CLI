@@ -201,6 +201,17 @@ class TestConfigPersistence(unittest.TestCase):
         backups = list(path.parent.glob("config.json.corrupt-*"))
         self.assertEqual(len(backups), 1)
 
+    def test_valid_json_but_not_dict_is_backed_up(self):
+        path = get_config_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('["esto", "no", "es", "un", "dict"]', encoding="utf-8")
+        cfg = Config.load()
+        self.assertFalse(cfg.is_configured())
+        backups = list(path.parent.glob("config.json.corrupt-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertFalse(path.exists())
+        self.assertIn("esto", backups[0].read_text(encoding="utf-8"))
+
     def test_atomic_save_leaves_no_temp(self):
         cfg = Config()
         cfg.set_provider("https://x/v1", "m1")

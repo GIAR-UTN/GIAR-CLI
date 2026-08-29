@@ -58,8 +58,6 @@ class Config:
         if path.exists():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    return cls(data)
             except Exception as exc:
                 backup = cls._backup_corrupt(path)
                 print(
@@ -67,6 +65,15 @@ class Config:
                     "y se usará la configuración por defecto.",
                     file=sys.stderr,
                 )
+                return cls()
+            if isinstance(data, dict):
+                return cls(data)
+            backup = cls._backup_corrupt(path)
+            print(
+                f"giar: config.json con formato inesperado; se respaldó en {backup} "
+                "y se usará la configuración por defecto.",
+                file=sys.stderr,
+            )
         return cls()
 
     @staticmethod
