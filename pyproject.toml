@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "giar-cli"
+version = "0.1.0"
+description = "GIAR - Asistente IA por consola estilo Claude Code. OpenAI-compatible + MCP streamable-http + Skills."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "GIAR" }]
+keywords = ["cli", "llm", "openai", "mcp", "agent", "chat"]
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Topic :: Terminals",
+]
+dependencies = [
+    "rich>=13.0",
+    "httpx>=0.27",
+    "prompt_toolkit>=3.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+giar = "giar.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["giar*"]
+
+[tool.setuptools.package-data]
+giar = ["py.typed"]
