@@ -16,6 +16,7 @@ from rich.text import Text
 
 from giar import __version__
 from giar.config import Config, get_history_path
+from giar.latex import prepare_markdown
 from giar.llm import LLMClient, LLMError
 from giar.mcp import MCPClient, MCPError
 from giar.skills import discover_skills, load_project_context
@@ -48,7 +49,7 @@ def _render_live_text(title: str, content: str) -> Panel:
 
 
 def _render_live_markdown(title: str, content: str) -> Panel:
-    body: Any = Markdown(content) if content else Text("…")
+    body: Any = Markdown(prepare_markdown(content)) if content else Text("…")
     return Panel(
         body,
         title=title,
@@ -85,7 +86,7 @@ def _render_reasoning_final(reasoning: str) -> None:
 def _render_final(title: str, content: str) -> None:
     console.print(
         Panel(
-            Markdown(content),
+            Markdown(prepare_markdown(content)),
             title=title,
             border_style="blue",
             title_align="left",

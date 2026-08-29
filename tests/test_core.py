@@ -11,6 +11,7 @@ from giar.llm import LLMClient, LLMError, _normalize_effort
 from giar.skills import _split_frontmatter, parse_skill_dir, discover_skills
 from giar.tools import arguments_to_kwargs
 from giar.config import Config, get_config_path
+from giar.latex import prepare_markdown
 
 
 class TestSSE(unittest.TestCase):
@@ -206,6 +207,83 @@ class TestConfigPersistence(unittest.TestCase):
         leftovers = list(get_config_path().parent.glob("config.json.tmp"))
         self.assertEqual(leftovers, [])
         self.assertTrue(get_config_path().exists())
+
+
+class TestLatex(unittest.TestCase):
+    def test_inline_math(self):
+        self.assertEqual(
+            prepare_markdown("$x_i + y_j = z^2$"),
+            "xᵢ + yⱼ = z²",
+        )
+
+    def test_display_math(self):
+        self.assertEqual(
+            prepare_markdown("$$E = mc^2$$"),
+            "E = mc²",
+        )
+
+    def test_nested_frac(self):
+        self.assertEqual(
+            prepare_markdown(r"$$\frac{\frac{1}{2}+\frac{3}{4}}{x}$$"),
+            "((1)/(2)+(3)/(4))/(x)",
+        )
+
+    def test_sqrt_and_frac(self):
+        self.assertEqual(
+            prepare_markdown(r"$$\frac{a}{b} = \sqrt{c}$$"),
+            "(a)/(b) = √(c)",
+        )
+
+    def test_greek_and_symbols(self):
+        self.assertEqual(
+            prepare_markdown(r"$\alpha + \beta \times \gamma \geq 0$"),
+            "α + β × γ ≥ 0",
+        )
+
+    def test_superscript_subscript_unicode(self):
+        self.assertEqual(prepare_markdown(r"$\lambda_i = \sum_{j=1}^{n} x_{ij}$"),
+                         "λᵢ = ∑ⱼ₌₁ⁿ xᵢⱼ")
+
+    def test_paren_and_bracket_forms(self):
+        self.assertEqual(
+            prepare_markdown(r"\( a^2 + b^2 = c^2 \)"),
+            "a² + b² = c²",
+        )
+
+    def test_text_command(self):
+        self.assertEqual(
+            prepare_markdown(r"$$\text{hola } x \geq 0$$"),
+            "hola x ≥ 0",
+        )
+
+    def test_escapes_markdown_sensitive_chars(self):
+        self.assertEqual(
+            prepare_markdown(r"$\lim_{x \to 0} f(x)$"),
+            r"lim\_(x → 0) f(x)",
+        )
+
+    def test_code_spans_untouched(self):
+        self.assertEqual(
+            prepare_markdown("`echo $HOME` y `x=$((a+b))`"),
+            "`echo $HOME` y `x=$((a+b))`",
+        )
+
+    def test_code_blocks_untouched(self):
+        src = "```bash\nrm -rf $HOME/*\n```"
+        self.assertEqual(prepare_markdown(src), src)
+
+    def test_prices_untouched(self):
+        self.assertEqual(
+            prepare_markdown("cuesta $5 y $10, o $5.99"),
+            "cuesta $5 y $10, o $5.99",
+        )
+
+    def test_single_char_math(self):
+        self.assertEqual(prepare_markdown("variable $x$"), "variable x")
+
+    def test_math_inside_code_is_not_touched(self):
+        src = "`$x_i$` se queda"
+        self.assertEqual(prepare_markdown(src), src)
 
 
 if __name__ == "__main__":
