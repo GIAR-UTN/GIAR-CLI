@@ -16,7 +16,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from giar import __version__
-from giar.config import Config, get_history_path
+from giar.config import Config, get_history_path, get_home
 from giar.latex import prepare_markdown
 from giar.llm import LLMClient, LLMError
 from giar.mcp import MCPClient, MCPError
@@ -146,7 +146,7 @@ class ChatSession:
         )
         self.skills = [
             s
-            for s in discover_skills(self.cwd, Path.home())
+            for s in discover_skills(self.cwd, get_home())
             if self.config.is_skill_enabled(s.name)
         ]
         if self.connect_mcps:
@@ -408,11 +408,11 @@ class ChatSession:
                     "no se guardó la respuesta. Inténtalo de nuevo."
                 )
                 return
-            if content:
-                self.messages.append(
-                    {"role": "assistant", "content": content}
-                )
             if not calls:
+                if content:
+                    self.messages.append(
+                        {"role": "assistant", "content": content}
+                    )
                 return
             self.messages.append(
                 {

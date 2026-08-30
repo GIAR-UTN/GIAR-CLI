@@ -1,18 +1,24 @@
 """Pruebas unitarias de GIAR (sin red). Ejecutar: python -m unittest discover tests"""
 
+import asyncio
 import tempfile
 import unittest
 import os
 from pathlib import Path
 from unittest import mock
 
-from giar.mcp import _parse_sse, _sanitize
+from giar.mcp import _format_error, _parse_sse, _sanitize
 from giar.llm import LLMClient, LLMError, _normalize_effort
-from giar.skills import _split_frontmatter, parse_skill_dir, discover_skills
-from giar.tools import arguments_to_kwargs
+from giar.skills import (
+    _split_frontmatter,
+    discover_skills,
+    find_agents_md,
+    parse_skill_dir,
+)
+from giar.tools import _project_tool_handler, arguments_to_kwargs
 from giar.config import Config, get_config_path
 from giar.latex import prepare_markdown
-from giar.chat import _is_degenerate
+from giar.chat import ChatSession, _is_degenerate
 
 
 class TestSSE(unittest.TestCase):
@@ -323,6 +329,189 @@ class TestLatex(unittest.TestCase):
     def test_math_inside_code_is_not_touched(self):
         src = "`$x_i$` se queda"
         self.assertEqual(prepare_markdown(src), src)
+
+
+class TestPathRestriction(unittest.TestCase):
+    """Bug 1: las rutas deben quedar dentro del proyecto (sin escape por prefijo)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "proj").mkdir()
+        (self.root / "proj-evil").mkdir()
+        (self.root / "proj-evil" / "secret.txt").write_text("DATOS SECRETOS")
+        self.read_file, self.list_dir = _project_tool_handler(self.root / "proj")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_sibling_dir_blocked(self):
+        with self.assertRaises(ValueError):
+            asyncio.run(self.read_file("../proj-evil/secret.txt"))
+
+    def test_absolute_outside_blocked(self):
+        with self.assertRaises(ValueError):
+            asyncio.run(self.read_file(str(self.root / "proj-evil" / "secret.txt")))
+
+    def test_list_dir_outside_blocked(self):
+        with self.assertRaises(ValueError):
+            asyncio.run(self.list_dir("../proj-evil"))
+
+    def test_inside_project_allowed(self):
+        (self.root / "proj" / "a.txt").write_text("hola")
+        self.assertEqual(asyncio.run(self.read_file("a.txt")), "hola")
+
+    def test_absolute_inside_allowed(self):
+        (self.root / "proj" / "b.txt").write_text("x")
+        p = str(self.root / "proj" / "b.txt")
+        self.assertEqual(asyncio.run(self.read_file(p)), "x")
+
+
+class TestMCPFormatError(unittest.TestCase):
+    """Bug 5: errores MCP en forma de string no deben romper el cliente."""
+
+    def test_string_error(self):
+        self.assertEqual(_format_error("boom"), "[error MCP] boom")
+
+    def test_dict_error(self):
+        self.assertEqual(
+            _format_error({"code": -32601, "message": "método no encontrado"}),
+            "[error MCP] -32601 método no encontrado",
+        )
+
+
+class TestAgentsStop(unittest.TestCase):
+    """Bug 6: la búsqueda de AGENTS.md debe parar en el home del usuario."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.home = self.base / "home"
+        (self.home / "proj").mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_ignores_agents_above_home(self):
+        (self.base / "AGENTS.md").write_text("contexto raíz")
+        self.assertIsNone(find_agents_md(self.home / "proj", self.home))
+
+    def test_finds_within_home(self):
+        (self.home / "AGENTS.md").write_text("contexto home")
+        self.assertEqual(
+            find_agents_md(self.home / "proj", self.home), self.home / "AGENTS.md"
+        )
+
+    def test_project_takes_precedence(self):
+        (self.home / "proj" / "AGENTS.md").write_text("contexto proyecto")
+        (self.home / "AGENTS.md").write_text("contexto home")
+        self.assertEqual(
+            find_agents_md(self.home / "proj", self.home),
+            self.home / "proj" / "AGENTS.md",
+        )
+
+
+class TestRunTurnMessages(unittest.TestCase):
+    """Bug 2: content + tool_calls no debe duplicar el mensaje assistant."""
+
+    def test_content_and_calls_single_assistant_message(self):
+        session = ChatSession(Config())
+        session.messages = [{"role": "system", "content": "x"}]
+        n_calls = 0
+
+        async def fake_stream(*args, **kwargs):
+            nonlocal n_calls
+            n_calls += 1
+            if n_calls == 1:
+                return {
+                    "content": "texto",
+                    "tool_calls": [
+                        {"id": "1", "name": "read_file", "arguments": "{}"}
+                    ],
+                    "degenerate": False,
+                }
+            return {
+                "content": "respuesta final",
+                "tool_calls": [],
+                "degenerate": False,
+            }
+
+        async def fake_exec(call):
+            return "ok"
+
+        session.stream_assistant = fake_stream
+        session.execute_tool_call = fake_exec
+        asyncio.run(session.run_turn("hola"))
+
+        roles = [m["role"] for m in session.messages]
+        for a, b in zip(roles, roles[1:]):
+            self.assertFalse(a == "assistant" and b == "assistant")
+        tc_msgs = [m for m in session.messages if m.get("tool_calls")]
+        self.assertEqual(len(tc_msgs), 1)
+        self.assertEqual(tc_msgs[0]["content"], "texto")
+        self.assertEqual(
+            tc_msgs[0]["tool_calls"][0]["function"]["name"], "read_file"
+        )
+
+    def test_content_only_appends_once(self):
+        session = ChatSession(Config())
+        session.messages = [{"role": "system", "content": "x"}]
+
+        async def fake_stream(*args, **kwargs):
+            return {
+                "content": "solo texto",
+                "tool_calls": [],
+                "degenerate": False,
+            }
+
+        session.stream_assistant = fake_stream
+        asyncio.run(session.run_turn("hola"))
+        roles = [m["role"] for m in session.messages]
+        self.assertEqual(roles.count("assistant"), 1)
+
+
+class TestShowReasoningInit(unittest.TestCase):
+    """Bug 4: show_reasoning=None debe respetar la config persistida."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(
+            os.environ, {"GIAR_HOME": self.tmp.name}, clear=False
+        )
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def test_none_uses_config(self):
+        cfg = Config()
+        cfg.set_show_reasoning(False)
+        self.assertFalse(ChatSession(cfg, show_reasoning=None).show_reasoning)
+
+    def test_false_forces_hidden(self):
+        cfg = Config()
+        cfg.set_show_reasoning(True)
+        self.assertFalse(ChatSession(cfg, show_reasoning=False).show_reasoning)
+
+
+class TestUserSkillsAtGiarHome(unittest.TestCase):
+    """Bug 3: discover_skills(cwd, get_home()) encuentra ~/.giar/skills."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.giar_home = self.root / ".giar"
+        d = self.giar_home / "skills" / "global"
+        d.mkdir(parents=True)
+        (d / "SKILL.md").write_text("---\nname: global\n---\nCuerpo")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_skill_in_giar_home_found(self):
+        found = discover_skills(self.root / "proyecto", self.giar_home)
+        self.assertIn("global", {s.name for s in found})
 
 
 if __name__ == "__main__":

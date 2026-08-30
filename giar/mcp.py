@@ -157,7 +157,11 @@ class MCPClient:
             }
             msg = await self._post(payload)
             if "error" in msg:
-                message = str(msg.get("error", {}).get("message", ""))
+                err = msg.get("error") or {}
+                if isinstance(err, dict):
+                    message = str(err.get("message", ""))
+                else:
+                    message = str(err)
                 errors.append(message)
                 m = re.search(r"(\d{4}-\d{2}-\d{2})", message)
                 if m and m.group(1) in PROTOCOL_VERSIONS:
@@ -246,8 +250,14 @@ def _format_result(result: Dict[str, Any]) -> str:
     return prefix + (body or "(sin contenido)")
 
 
-def _format_error(error: Dict[str, Any]) -> str:
-    return f"[error MCP] {error.get('code', '')} {error.get('message', '')}".strip()
+def _format_error(error: Any) -> str:
+    if isinstance(error, dict):
+        code = error.get("code", "")
+        message = error.get("message", "")
+    else:
+        code, message = "", error
+    parts = [p for p in (str(code), str(message)) if p]
+    return "[error MCP] " + " ".join(parts)
 
 
 def new_request_id() -> int:

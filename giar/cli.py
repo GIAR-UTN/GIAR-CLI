@@ -287,7 +287,7 @@ def cmd_chat(args: argparse.Namespace) -> None:
         cwd=cwd,
         model=cfg.model,
         connect_mcps=not args_mcp_off,
-        show_reasoning=not args_no_reasoning,
+        show_reasoning=None if not args_no_reasoning else False,
     )
 
     async def _run() -> None:
@@ -396,7 +396,7 @@ def cmd_skills(args: argparse.Namespace) -> None:
             console.print(f"      {s.description}")
         if s.files:
             console.print(f"      [dim]archivos: {', '.join(f.name for f in s.files)}[/]")
-    agents = find_agents_md(cwd, get_home())
+    agents = find_agents_md(cwd, Path.home())
     if agents:
         console.print(f"\n[bold]Contexto de proyecto:[/] {agents}")
     else:

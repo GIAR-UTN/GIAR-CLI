@@ -67,7 +67,7 @@ def _project_tool_handler(cwd: Path):
         if not base.is_absolute():
             base = cwd / base
         base = base.resolve()
-        if not str(base).startswith(str(cwd.resolve())):
+        if not base.is_relative_to(cwd.resolve()):
             raise ValueError(f"Ruta fuera del proyecto: {path}")
         return base
 
