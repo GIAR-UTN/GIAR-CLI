@@ -40,6 +40,7 @@ def default_config() -> Dict[str, Any]:
             "api_key": "",
             "headers": {},
             "reasoning_effort": "",
+            "temperature": 0.3,
             "show_reasoning": True,
         },
         "mcps": [],
@@ -135,6 +136,17 @@ class Config:
         return (self.provider.get("reasoning_effort") or "").strip()
 
     @property
+    def temperature(self) -> Optional[float]:
+        """Temperatura de muestreo; None para no enviarla al endpoint."""
+        value = self.provider.get("temperature")
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @property
     def show_reasoning(self) -> bool:
         return bool(self.provider.get("show_reasoning", True))
 
@@ -149,6 +161,7 @@ class Config:
         api_key: Optional[str] = None,
         extra_headers: Optional[Dict[str, str]] = None,
         reasoning_effort: Optional[str] = None,
+        temperature: Optional[float] = None,
     ) -> None:
         base_url = base_url.strip().rstrip("/")
         self.provider["base_url"] = base_url
@@ -159,6 +172,16 @@ class Config:
             self.provider["headers"] = dict(extra_headers)
         if reasoning_effort is not None:
             self.provider["reasoning_effort"] = reasoning_effort.strip().lower()
+        if temperature is not None:
+            self.provider["temperature"] = float(temperature)
+        self.save()
+
+    def set_temperature(self, value: Optional[float]) -> None:
+        """Fija la temperatura; None la elimina de la configuración."""
+        if value is None:
+            self.provider.pop("temperature", None)
+        else:
+            self.provider["temperature"] = float(value)
         self.save()
 
     def is_configured(self) -> bool:

@@ -95,6 +95,7 @@ giar mcp add otro http://localhost:3000/mcp --header "X-API-Key: abc"
 /help             Ayuda
 /model <name>     Cambiar modelo
 /effort <nivel>   Reasoning effort: low | medium | high | off
+/temperature <n>  Temperatura de muestreo: 0.0-2.0 (off para no fijarla)
 /reasoning on|off Mostrar/ocultar el pensamiento del modelo
 /turns <n>        Límite de turnos de herramientas por mensaje
 /clear            Reinicia la conversación (el logo queda fijo arriba)
@@ -130,6 +131,10 @@ o la rueda del ratón.
   cuánto "piensa" el modelo antes de responder. Se configura en
   `giar config llm` o en caliente con `/effort`. Solo se envía al endpoint
   cuando está definido, así que es seguro con cualquier modelo.
+- **`temperature`** (`0.0`–`2.0`): control de la aleatoriedad de la respuesta.
+  Se configura en `provider.temperature` de `config.json` (por defecto `0.3`),
+  en caliente con `/temperature <n>` (o `/temperature off` para no fijarla).
+  Si se elimina del fichero, no se envía y el endpoint usa su valor por defecto.
 - **Pensamiento en streaming**: si el modelo incluye su razonamiento en el
   streaming (`reasoning_content`/`reasoning`), GIAR lo muestra en un bloque
   atenuado "🤔 Razonamiento" encima de la respuesta. Ocúltalo con
@@ -176,6 +181,7 @@ Todo se guarda en `~/.giar/config.json` (o `$GIAR_HOME`):
     "api_key": "sk-...",
     "headers": {},
     "reasoning_effort": "medium",
+    "temperature": 0.3,
     "show_reasoning": true
   },
   "mcps": [

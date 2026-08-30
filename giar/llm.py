@@ -44,6 +44,7 @@ class LLMClient:
         model: str = "",
         extra_headers: Optional[Dict[str, str]] = None,
         reasoning_effort: Optional[str] = None,
+        temperature: Optional[float] = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         base_url = (base_url or "").strip().rstrip("/")
@@ -55,6 +56,7 @@ class LLMClient:
         self.api_key = (api_key or "").strip()
         self.model = model
         self.reasoning_effort = _normalize_effort(reasoning_effort)
+        self.temperature = temperature
         self.extra_headers = dict(extra_headers or {})
         self._client = httpx.AsyncClient(timeout=timeout)
 
@@ -89,6 +91,8 @@ class LLMClient:
         }
         if tools:
             payload["tools"] = tools
+        if temperature is None:
+            temperature = self.temperature
         if temperature is not None:
             payload["temperature"] = temperature
         effort = _normalize_effort(reasoning_effort)

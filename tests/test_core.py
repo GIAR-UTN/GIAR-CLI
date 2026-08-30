@@ -230,6 +230,27 @@ class TestMaxTurns(unittest.TestCase):
         asyncio.run(session.handle_command("/turns abc"))
         self.assertEqual(session.max_turns, cfg.max_turns)
 
+    def test_temperature_command_sets_and_persists(self):
+        cfg = Config()
+        session = ChatSession(cfg)
+        asyncio.run(session.handle_command("/temperature 0.7"))
+        self.assertEqual(session.temperature, 0.7)
+        self.assertEqual(Config.load().temperature, 0.7)
+
+    def test_temperature_command_off(self):
+        cfg = Config()
+        cfg.set_temperature(0.7)
+        session = ChatSession(cfg)
+        asyncio.run(session.handle_command("/temperature off"))
+        self.assertIsNone(session.temperature)
+        self.assertIsNone(Config.load().temperature)
+
+    def test_temperature_command_rejects_bad_value(self):
+        cfg = Config()
+        session = ChatSession(cfg)
+        asyncio.run(session.handle_command("/temperature abc"))
+        self.assertEqual(session.temperature, cfg.temperature)
+
 
 class TestConfigPersistence(unittest.TestCase):
     def setUp(self):

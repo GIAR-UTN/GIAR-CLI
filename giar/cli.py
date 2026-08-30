@@ -204,6 +204,7 @@ def test_llm(cfg: Config) -> bool:
             cfg.model,
             cfg.extra_headers,
             reasoning_effort=cfg.reasoning_effort or None,
+            temperature=cfg.temperature,
         )
         try:
             parts = []

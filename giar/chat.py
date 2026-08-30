@@ -387,6 +387,7 @@ class ChatSession:
         self.cwd = Path.cwd() if cwd is None else Path(cwd)
         self.model = model or config.model or ""
         self.reasoning_effort = config.reasoning_effort or ""
+        self.temperature = config.temperature
         self.show_reasoning = config.show_reasoning if show_reasoning is None else show_reasoning
         self.max_turns = config.max_turns
         self.connect_mcps = connect_mcps
@@ -428,6 +429,7 @@ class ChatSession:
             model=self.model,
             extra_headers=self.config.extra_headers,
             reasoning_effort=self.reasoning_effort or None,
+            temperature=self.temperature,
         )
         self.skills = [
             s
@@ -476,6 +478,10 @@ class ChatSession:
                 f"[bold]Reasoning effort:[/] {self.reasoning_effort}  "
                 f"[dim](/effort para cambiar)[/]"
             )
+        lines.append(
+            f"[bold]Temperatura:[/] {self.temperature if self.temperature is not None else '(sin fijar)'}  "
+            f"[dim](/temperature para cambiar)[/]"
+        )
         lines.append(
             f"[bold]Límite de turnos:[/] {self.max_turns}  "
             f"[dim](/turns para cambiar; deja que las secuencias largas terminen)[/]"
@@ -623,6 +629,32 @@ class ChatSession:
                     self._emit_markup("[bold yellow]⚠[/] Usa: /effort low | medium | high | off")
             else:
                 self._emit_markup(f"[bold]Reasoning effort actual:[/] {self.reasoning_effort or '(desactivado)'}")
+        elif cmd == "/temperature":
+            if arg:
+                val = arg.strip().lower()
+                if val in ("off", "none", "auto", "default"):
+                    self.temperature = None
+                    if self.llm:
+                        self.llm.temperature = None
+                    self.config.set_temperature(None)
+                    self._emit_markup("[bold green]✔[/] Temperatura sin fijar (el endpoint usa su valor por defecto)")
+                else:
+                    try:
+                        value = float(val)
+                    except ValueError:
+                        self._emit_markup("[bold yellow]⚠[/] Usa: /temperature <0.0-2.0> | off")
+                    else:
+                        if value < 0.0 or value > 2.0:
+                            self._emit_markup("[bold yellow]⚠[/] La temperatura debe estar entre 0.0 y 2.0")
+                        else:
+                            self.temperature = value
+                            if self.llm:
+                                self.llm.temperature = value
+                            self.config.set_temperature(value)
+                            self._emit_markup(f"[bold green]✔[/] Temperatura cambiada a: {value}")
+            else:
+                current = self.temperature if self.temperature is not None else "(sin fijar)"
+                self._emit_markup(f"[bold]Temperatura actual:[/] {current}  [dim](/temperature <0.0-2.0> para cambiar)[/]")
         elif cmd == "/reasoning":
             if arg:
                 val = arg.strip().lower()
@@ -692,6 +724,7 @@ class ChatSession:
                     "  /help            Muestra esta ayuda",
                     "  /model <name>    Cambia el modelo del LLM",
                     "  /effort <nivel>  Reasoning effort: low | medium | high | off",
+                    "  /temperature <0.0-2.0>  Temperatura de muestreo (off para no fijarla)",
                     "  /reasoning on|off  Mostrar/ocultar el pensamiento del modelo",
                     "  /turns <n>       Límite de turnos de herramientas por mensaje",
                     "  /clear           Reinicia la conversación",
@@ -797,6 +830,7 @@ class ChatSession:
                 self.messages,
                 tools=self.registry.to_openai_list(),
                 model=self.model,
+                temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort or None,
             ):
                 etype = event["type"]
