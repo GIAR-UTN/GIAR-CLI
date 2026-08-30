@@ -175,6 +175,56 @@ class TestShowReasoning(unittest.TestCase):
         self.assertTrue(cfg.show_reasoning)
 
 
+class TestMaxTurns(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(
+            os.environ, {"GIAR_HOME": self.tmp.name}, clear=False
+        )
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def test_default(self):
+        cfg = Config()
+        self.assertEqual(cfg.max_turns, 200)
+
+    def test_set_and_persist(self):
+        cfg = Config()
+        cfg.set_max_turns(500)
+        loaded = Config.load()
+        self.assertEqual(loaded.max_turns, 500)
+
+    def test_min_clamped(self):
+        cfg = Config()
+        cfg.set_max_turns(0)
+        self.assertEqual(Config.load().max_turns, 1)
+
+    def test_invalid_value_uses_default(self):
+        cfg = Config({"chat": {"max_turns": "abc"}})
+        self.assertEqual(cfg.max_turns, 200)
+
+    def test_session_uses_config(self):
+        cfg = Config()
+        cfg.set_max_turns(7)
+        self.assertEqual(ChatSession(cfg).max_turns, 7)
+
+    def test_turns_command_sets_and_persists(self):
+        cfg = Config()
+        session = ChatSession(cfg)
+        asyncio.run(session.handle_command("/turns 42"))
+        self.assertEqual(session.max_turns, 42)
+        self.assertEqual(Config.load().max_turns, 42)
+
+    def test_turns_command_rejects_bad_value(self):
+        cfg = Config()
+        session = ChatSession(cfg)
+        asyncio.run(session.handle_command("/turns abc"))
+        self.assertEqual(session.max_turns, cfg.max_turns)
+
+
 class TestConfigPersistence(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

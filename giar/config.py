@@ -17,6 +17,8 @@ DEFAULT_HOME = "~/.giar"
 CONFIG_FILE = "config.json"
 HISTORY_FILE = "history.txt"
 
+DEFAULT_MAX_TURNS = 200
+
 
 def get_home() -> Path:
     return Path(os.environ.get("GIAR_HOME", DEFAULT_HOME)).expanduser()
@@ -42,6 +44,7 @@ def default_config() -> Dict[str, Any]:
         },
         "mcps": [],
         "skills": {"disabled": []},
+        "chat": {"max_turns": DEFAULT_MAX_TURNS},
     }
 
 
@@ -219,6 +222,24 @@ class Config:
         else:
             disabled.add(name)
         self.skills_config["disabled"] = sorted(disabled)
+        self.save()
+
+    # ---------------------------------------------------------------------- chat
+    @property
+    def chat_config(self) -> Dict[str, Any]:
+        return self.data.setdefault("chat", {})
+
+    @property
+    def max_turns(self) -> int:
+        """Máximo de turnos de herramientas por turno de usuario."""
+        try:
+            value = int(self.chat_config.get("max_turns", DEFAULT_MAX_TURNS))
+        except (TypeError, ValueError):
+            value = DEFAULT_MAX_TURNS
+        return value if value >= 1 else DEFAULT_MAX_TURNS
+
+    def set_max_turns(self, value: int) -> None:
+        self.chat_config["max_turns"] = max(1, int(value))
         self.save()
 
     # -------------------------------------------------------------------- misc

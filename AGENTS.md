@@ -33,7 +33,8 @@ mensajes son en **español**.
   (`config llm|mcp`, `mcp add/list/...`, `doctor`). Punto de entrada `main()`.
 - `chat.py` — sesión interactiva: streaming con `rich.live`, razonamiento,
   tool calls, comandos `/...`, historial de prompt_toolkit. Bucle de
-  herramientas limitado a `MAX_TURNS = 20`.
+  herramientas limitado a `max_turns` (configurable en `config.json` con
+  `chat.max_turns` o en caliente con `/turns <n>`; por defecto 200).
 - `config.py` — config persistente en `~/.giar/config.json` (o `$GIAR_HOME`).
   Guardado **atómico** (tmp + `os.replace`, permisos `0600`); si el fichero
   está corrupto se respalda como `config.json.corrupt-<fecha>` sin perderlo.

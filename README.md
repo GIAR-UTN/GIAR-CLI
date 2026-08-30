@@ -93,6 +93,7 @@ giar mcp add otro http://localhost:3000/mcp --header "X-API-Key: abc"
 /model <name>     Cambiar modelo
 /effort <nivel>   Reasoning effort: low | medium | high | off
 /reasoning on|off Mostrar/ocultar el pensamiento del modelo
+/turns <n>        Límite de turnos de herramientas por mensaje
 /clear            Reinicia la conversación y vuelve a mostrar el logo
 /skills           Ver skills detectados
 /tools            Ver herramientas disponibles
@@ -100,6 +101,19 @@ giar mcp add otro http://localhost:3000/mcp --header "X-API-Key: abc"
 /config           Dónde y cómo configurar
 /exit             Salir (o Ctrl+D)
 ```
+
+### Secuencias largas de herramientas
+
+GIAR puede ejecutar secuencias largas de tool calls (bucles, movimientos,
+lecturas repetidas) hasta completar el objetivo, sin que la respuesta sea
+inmediata. Por ejemplo, puedes pedirle a un robot que camine un metro usando
+un bucle: avanzar un poco, consultar la odometría y repetir hasta alcanzar la
+distancia, para luego parar.
+
+- Por defecto hay un límite de **200 turnos** de herramientas por mensaje
+  (configurable en `config.json` con `chat.max_turns` o en caliente con
+  `/turns <n>`).
+- `Ctrl+C` interrumpe el turno en curso si quieres detener la secuencia.
 
 `Ctrl+L` limpia la pantalla y vuelve a mostrar el banner de GIAR (igual que
 `/clear`).
@@ -161,7 +175,8 @@ Todo se guarda en `~/.giar/config.json` (o `$GIAR_HOME`):
   "mcps": [
     { "name": "mi-servidor", "url": "https://…/mcp", "headers": {}, "enabled": true }
   ],
-  "skills": { "disabled": [] }
+  "skills": { "disabled": [] },
+  "chat": { "max_turns": 200 }
 }
 ```
 

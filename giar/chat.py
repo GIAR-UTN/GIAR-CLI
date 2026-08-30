@@ -30,7 +30,6 @@ from giar.tools import (
 )
 from giar.ui import banner, console, info, success, warn
 
-MAX_TURNS = 20
 MAX_DEGENERATE_RETRIES = 3
 
 _ELLIPSIS = re.compile(r"[.…]{2,}")
@@ -127,6 +126,7 @@ class ChatSession:
         self.model = model or config.model or ""
         self.reasoning_effort = config.reasoning_effort or ""
         self.show_reasoning = config.show_reasoning if show_reasoning is None else show_reasoning
+        self.max_turns = config.max_turns
         self.connect_mcps = connect_mcps
         self.messages: List[Dict[str, Any]] = []
         self.skills = []
@@ -187,6 +187,10 @@ class ChatSession:
         if self.reasoning_effort:
             info(f"[bold]Reasoning effort:[/] {self.reasoning_effort}  [dim](/effort para cambiar)[/]")
         info(
+            f"[bold]Límite de turnos:[/] {self.max_turns}  "
+            f"[dim](/turns para cambiar; deja que las secuencias largas terminen)[/]"
+        )
+        info(
             f"[bold]Razonamiento:[/] {'visible' if self.show_reasoning else 'oculto'}  "
             f"[dim](/reasoning on|off)[/]"
         )
@@ -218,6 +222,11 @@ class ChatSession:
             "- Usa las herramientas disponibles cuando aporten valor.",
             "- Si el usuario te pide trabajar con un skill, cárgalo primero con read_skill.",
             "- Las herramientas de servidores MCP llevan el prefijo mcp__<servidor>__<herramienta>.",
+            "- Puedes ejecutar secuencias largas de herramientas (bucles, movimientos, lecturas repetidas) "
+            "hasta completar el objetivo: no hace falta dar la respuesta final hasta haber terminado. "
+            "Por ejemplo, para mover un robot puedes avanzar poco a poco consultando la odometría "
+            "en cada paso y parar al alcanzar el objetivo.",
+            "- No repitas indefinidamente: si el objetivo no avanza o falla, detente y explica qué está pasando.",
             "- Cuando termines, entrega el resultado final en texto plano.",
         ]
         project_context = load_project_context(self.cwd, Path.home())
@@ -341,6 +350,24 @@ class ChatSession:
             self.messages = [{"role": "system", "content": self._system_prompt()}]
             self._redraw()
             success("Conversación reiniciada")
+        elif cmd == "/turns":
+            if arg:
+                try:
+                    value = int(arg.strip())
+                except ValueError:
+                    warn("Usa: /turns <número> (mínimo 1)")
+                else:
+                    if value < 1:
+                        warn("El mínimo es 1 turno.")
+                    else:
+                        self.max_turns = value
+                        self.config.set_max_turns(value)
+                        success(
+                            f"Límite de turnos por mensaje: {value} "
+                            "(permite secuencias largas de herramientas)"
+                        )
+            else:
+                info(f"Límite de turnos actual: {self.max_turns}  [dim](/turns <n> para cambiar)[/]")
         elif cmd == "/skills":
             if self.skills:
                 for s in self.skills:
@@ -374,6 +401,7 @@ class ChatSession:
                     "  /model <name>    Cambia el modelo del LLM",
                     "  /effort <nivel>  Reasoning effort: low | medium | high | off",
                     "  /reasoning on|off  Mostrar/ocultar el pensamiento del modelo",
+                    "  /turns <n>       Límite de turnos de herramientas por mensaje",
                     "  /clear           Reinicia la conversación (y muestra el logo)",
                     "  /skills          Lista los skills detectados",
                     "  /tools           Lista las herramientas disponibles",
@@ -394,7 +422,7 @@ class ChatSession:
     async def run_turn(self, text: str) -> None:
         self.messages.append({"role": "user", "content": text})
         degenerate_retries = 0
-        for _ in range(MAX_TURNS):
+        for _ in range(self.max_turns):
             assistant = await self.stream_assistant()
             content = assistant["content"]
             calls = assistant["tool_calls"]
