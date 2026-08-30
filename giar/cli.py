@@ -342,8 +342,9 @@ def cmd_config(args: argparse.Namespace) -> None:
 
 
 def cmd_mcp(args: argparse.Namespace) -> None:
+    """Gestionar servidores MCP: add <nombre> <url>, list, remove, toggle, test."""
     cfg = Config.load()
-    action = args.mcp_action
+    action = args.mcp_action or "list"
 
     if action == "add":
         headers: Dict[str, str] = {}
@@ -388,7 +389,7 @@ def cmd_mcp(args: argparse.Namespace) -> None:
 
 def cmd_skills(args: argparse.Namespace) -> None:
     cwd = Path(args.cwd).resolve() if args.cwd else Path.cwd()
-    banner()
+    banner(cmd=True)
     skills = discover_skills(cwd, get_home())
     console.print(f"[bold]Skills detectados en {cwd}:[/]")
     if not skills:
@@ -408,7 +409,7 @@ def cmd_skills(args: argparse.Namespace) -> None:
 
 def cmd_doctor(args: argparse.Namespace) -> None:
     cfg = Config.load()
-    banner()
+    banner(cmd=True)
     hline("Diagnóstico de GIAR")
 
     table = Table(box=None)

@@ -19,13 +19,21 @@ GIAR_ART = r"""██████╗  ██╗ █████╗ ████�
 ╚██████╔╝██║██║  ██║██║  ██║
  ╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝"""
 
+GIAR_ART_CMD = r"""██████╗ ██╗ █████╗ ██████╗ 
+██╔════╝ ██║██╔══██╗██╔══██╗
+██║  ███╗██║███████║██████╔╝
+██║   ██║██║██╔══██║██╔══██╗
+╚██████╔╝██║██║  ██║██║  ██║
+ ╚═════╝ ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝"""
+
 BLUE = "bold #4FC3F7"
 DIM = "dim"
 
 
-def banner() -> None:
+def banner(cmd: bool = False) -> None:
     """Imprime el arte ASCII de GIAR en azul."""
-    art = Text(GIAR_ART, style=BLUE)
+    ascii_source = GIAR_ART_CMD if cmd else GIAR_ART
+    art = Text(ascii_source, style=BLUE)
     tag = Text(
         f"  v{__version__} · asistente IA por consola",
         style="dim italic",
