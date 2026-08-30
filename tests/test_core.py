@@ -12,6 +12,7 @@ from giar.skills import _split_frontmatter, parse_skill_dir, discover_skills
 from giar.tools import arguments_to_kwargs
 from giar.config import Config, get_config_path
 from giar.latex import prepare_markdown
+from giar.chat import _is_degenerate
 
 
 class TestSSE(unittest.TestCase):
@@ -145,6 +146,17 @@ class TestReasoningEffort(unittest.TestCase):
 
 
 class TestShowReasoning(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(
+            os.environ, {"GIAR_HOME": self.tmp.name}, clear=False
+        )
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
     def test_default_true(self):
         cfg = Config()
         self.assertTrue(cfg.show_reasoning)
@@ -218,6 +230,22 @@ class TestConfigPersistence(unittest.TestCase):
         leftovers = list(get_config_path().parent.glob("config.json.tmp"))
         self.assertEqual(leftovers, [])
         self.assertTrue(get_config_path().exists())
+
+
+class TestDegenerate(unittest.TestCase):
+    def test_ellipsis_chain(self):
+        self.assertTrue(_is_degenerate("Se ha ... ... ... ... ... ... ..."))
+
+    def test_repetitive_words(self):
+        self.assertTrue(_is_degenerate("adelante adelante adelante adelante adelante"))
+
+    def test_normal_text(self):
+        self.assertFalse(
+            _is_degenerate("El resultado es correcto y se guardó en el fichero.")
+        )
+
+    def test_short_text_not_flagged(self):
+        self.assertFalse(_is_degenerate("..." ))
 
 
 class TestLatex(unittest.TestCase):

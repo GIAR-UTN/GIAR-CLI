@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -30,6 +31,23 @@ from giar.tools import (
 from giar.ui import banner, console, info, success, warn
 
 MAX_TURNS = 20
+MAX_DEGENERATE_RETRIES = 3
+
+_ELLIPSIS = re.compile(r"[.…]{2,}")
+
+
+def _is_degenerate(content: str) -> bool:
+    """Detecta salida degenerada del modelo: "..." en cadena o repetición excesiva."""
+    text = content.strip()
+    if len(text) < 4:
+        return False
+    ellipsis_chars = sum(len(m.group(0)) for m in _ELLIPSIS.finditer(text))
+    if ellipsis_chars / len(text) > 0.25:
+        return True
+    words = re.findall(r"\w+", text.lower())
+    if len(words) < 5:
+        return False
+    return len(set(words)) / len(words) < 0.4
 
 PROMPT_STYLE = [
     ("class:giar-prompt", "❯ "),
@@ -375,13 +393,25 @@ class ChatSession:
     # -------------------------------------------------------------- turn
     async def run_turn(self, text: str) -> None:
         self.messages.append({"role": "user", "content": text})
+        degenerate_retries = 0
         for _ in range(MAX_TURNS):
             assistant = await self.stream_assistant()
-            if assistant["content"]:
-                self.messages.append(
-                    {"role": "assistant", "content": assistant["content"]}
-                )
+            content = assistant["content"]
             calls = assistant["tool_calls"]
+            if assistant.get("degenerate"):
+                degenerate_retries += 1
+                if degenerate_retries <= MAX_DEGENERATE_RETRIES:
+                    warn("Salida degenerada del modelo; reintentando…")
+                    continue
+                warn(
+                    "El modelo sigue generando salida degenerada; "
+                    "no se guardó la respuesta. Inténtalo de nuevo."
+                )
+                return
+            if content:
+                self.messages.append(
+                    {"role": "assistant", "content": content}
+                )
             if not calls:
                 return
             self.messages.append(
@@ -471,11 +501,13 @@ class ChatSession:
         reasoning = "".join(reasoning_parts).strip()
         calls = [tool_calls[i] for i in order if tool_calls[i].get("id")]
 
+        degenerate = bool(content) and not calls and _is_degenerate(content)
+
         if reasoning and self.show_reasoning:
             _render_reasoning_final(reasoning)
-        if content:
+        if content and not degenerate:
             _render_final(title, content)
-        return {"content": content, "tool_calls": calls}
+        return {"content": content, "tool_calls": calls, "degenerate": degenerate}
 
     async def execute_tool_call(self, call: Dict[str, Any]) -> str:
         tool: Optional[Tool] = self.registry.get(call["name"])

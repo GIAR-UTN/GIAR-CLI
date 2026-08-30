@@ -63,6 +63,9 @@ mensajes son en **español**.
   el fichero. Nunca imprimir la api key (usar `to_redacted_dict()`).
 - Errores de red/LLM/MCP se propagan como `LLMError` / `MCPError`; el chat los
   muestra como avisos, no rompe la sesión.
+- El chat detecta salidas degeneradas del modelo (cadenas de `...` o repetición
+  excesiva) con `_is_degenerate()` y reintenta el turno hasta
+  `MAX_DEGENERATE_RETRIES` veces sin guardar la respuesta basura en el historial.
 - El venv de desarrollo puede vivir dentro de `giar/` (ver `.gitignore`:
   `giar/bin/`, `giar/lib/`…); solo se trackean los fuentes `giar/*.py`.
 - `README.md` documenta todos los comandos de la CLI y del chat; mantenerlo
