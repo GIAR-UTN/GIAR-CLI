@@ -18,7 +18,13 @@ from giar.skills import (
 from giar.tools import _project_tool_handler, arguments_to_kwargs
 from giar.config import Config, get_config_path
 from giar.latex import prepare_markdown
-from giar.chat import ChatSession, _is_degenerate
+from giar.chat import (
+    ChatSession,
+    _is_degenerate,
+    _rich_style_to_pt,
+    _Tui,
+    rich_to_fragments,
+)
 
 
 class TestSSE(unittest.TestCase):
@@ -562,6 +568,119 @@ class TestUserSkillsAtGiarHome(unittest.TestCase):
     def test_skill_in_giar_home_found(self):
         found = discover_skills(self.root / "proyecto", self.giar_home)
         self.assertIn("global", {s.name for s in found})
+
+
+class TestRichToFragments(unittest.TestCase):
+    """Conversión de renderables rich a fragmentos de prompt_toolkit."""
+
+    def test_markup_conserva_color(self):
+        from rich.text import Text
+
+        frags = rich_to_fragments(Text.from_markup("[bold yellow]⚠[/] aviso"), 80)
+        styled = [s for s, _ in frags if "⚠" in _]
+        self.assertTrue(any("bold" in s and "yellow" in s for s in styled))
+
+    def test_panel_borde_azul(self):
+        from rich.panel import Panel
+
+        frags = rich_to_fragments(Panel("hola", border_style="blue"), 80)
+        borders = [s for s, t in frags if t.startswith("╭")]
+        self.assertTrue(all("blue" in s for s in borders))
+
+    def test_markdown_convierte_texto(self):
+        from rich.markdown import Markdown
+
+        frags = rich_to_fragments(Markdown("## Título\n\n**negrita** y `código`"), 80)
+        text = "".join(t for _, t in frags)
+        self.assertIn("Título", text)
+        self.assertIn("código", text)
+
+    def test_estilo_vacio_para_texto_plano(self):
+        from rich.text import Text
+
+        frags = rich_to_fragments(Text("plano"), 80)
+        contenido = [(s, t) for s, t in frags if t.strip()]
+        self.assertEqual(contenido, [("", "plano")])
+
+
+class TestTuiHelpers(unittest.TestCase):
+    """Comportamiento de la pantalla completa sin necesidad de una terminal."""
+
+    def test_style_to_pt_truecolor(self):
+        from rich.style import Style
+
+        self.assertEqual(
+            _rich_style_to_pt(Style(color="#4FC3F7")), "fg:#4fc3f7"
+        )
+
+    def test_style_to_pt_ansi(self):
+        from rich.style import Style
+
+        self.assertEqual(_rich_style_to_pt(Style(color="blue")), "fg:ansiblue")
+        self.assertEqual(
+            _rich_style_to_pt(Style(color="bright_red")), "fg:ansibrightred"
+        )
+
+    def test_emit_acumula_bloques(self):
+        from rich.text import Text
+
+        session = ChatSession(Config())
+        session.tui = _Tui(session)
+        tui = session.tui
+        tui.emit(Text("primero"))
+        tui.emit(Text("segundo"))
+        text = "".join(t for _, t in tui.frags)
+        self.assertIn("primero", text)
+        self.assertIn("segundo", text)
+        self.assertIn("\n", text)
+
+    def test_set_live_y_clear(self):
+        from rich.text import Text
+
+        session = ChatSession(Config())
+        tui = _Tui(session)
+        tui.emit(Text("base"))
+        tui.set_live(Text("en vivo"))
+        text = "".join(t for _, t in tui.frags + tui.live_frags)
+        self.assertIn("en vivo", text)
+        tui.set_live(None)
+        self.assertEqual(tui.live_frags, [])
+
+    def test_visible_height_por_defecto(self):
+        session = ChatSession(Config())
+        tui = _Tui(session)
+        # Sin aplicación en marcha cae al valor por defecto.
+        self.assertGreaterEqual(tui._visible_height(), 10)
+
+
+class TestTurnEmiteMensajeUsuario(unittest.TestCase):
+    """En modo TUI el mensaje del usuario se muestra en la conversación."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(
+            os.environ, {"GIAR_HOME": self.tmp.name}, clear=False
+        )
+        self.env.start()
+
+    def tearDown(self):
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def test_panel_tu_en_tui(self):
+        session = ChatSession(Config(), tui=True)
+        session.messages = [{"role": "system", "content": "x"}]
+
+        async def fake_stream(*args, **kwargs):
+            return {"content": "respuesta", "tool_calls": [], "degenerate": False}
+
+        session.stream_assistant = fake_stream
+        asyncio.run(session.run_turn("mi pregunta"))
+
+        text = "".join(t for _, t in session.tui.frags)
+        self.assertIn("mi pregunta", text)
+        roles = [m["role"] for m in session.messages]
+        self.assertEqual(roles.count("user"), 1)
 
 
 if __name__ == "__main__":

@@ -275,7 +275,9 @@ def cmd_chat(args: argparse.Namespace) -> None:
             error("Configuración incompleta; no se puede iniciar el chat.")
             sys.exit(1)
 
-    banner()
+    # En el modo interactivo el logo ya está fijo en el header del TUI.
+    if args_prompt:
+        banner()
 
     if args_model:
         cfg.set_provider(cfg.base_url, args_model, cfg.api_key)
@@ -288,6 +290,7 @@ def cmd_chat(args: argparse.Namespace) -> None:
         model=cfg.model,
         connect_mcps=not args_mcp_off,
         show_reasoning=None if not args_no_reasoning else False,
+        tui=not bool(args_prompt),
     )
 
     async def _run() -> None:

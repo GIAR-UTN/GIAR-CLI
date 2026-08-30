@@ -31,10 +31,21 @@ mensajes son en **español**.
 
 - `cli.py` — parser argparse, subcomandos y asistentes de configuración
   (`config llm|mcp`, `mcp add/list/...`, `doctor`). Punto de entrada `main()`.
-- `chat.py` — sesión interactiva: streaming con `rich.live`, razonamiento,
-  tool calls, comandos `/...`, historial de prompt_toolkit. Bucle de
-  herramientas limitado a `max_turns` (configurable en `config.json` con
-  `chat.max_turns` o en caliente con `/turns <n>`; por defecto 200).
+  En `chat` el banner solo se imprime en modo `-p` (en la TUI el logo ya está
+  fijo en el header); se activa con `ChatSession(..., tui=not bool(args_prompt))`.
+- `chat.py` — sesión interactiva (`ChatSession`). En modo interactivo arranca
+  una **TUI de pantalla completa** (`_Tui`, prompt_toolkit `Application`) con el
+  logo de GIAR **fijo arriba** (`HEADER_HEIGHT = 8`), la conversación en un
+  `ScrollablePane` con scroll automático al final, y el input abajo (`TextArea`
+  con historial). Salida enriquecida con `rich.live` en el fallback no-TUI.
+  El enrutado de salida pasa por `_emit`/`_emit_markup`/`_emit_blank` (a la TUI
+  o a la consola rich según el modo). Conversión rich→fragmentos de
+  prompt_toolkit en `rich_to_fragments` (colores TRUECOLOR/EIGHT_BIT → `#hex`,
+  STANDARD → `ansi<nombre>`; la app NO acepta `fg:ansi1` numerado).
+  Los mensajes del usuario se muestran como panel `Tú` (borde verde) y las
+  respuestas como panel `GIAR · modelo` (borde azul). Comandos `/...`, historial,
+  y bucle de herramientas limitado a `max_turns` (configurable en `config.json`
+  con `chat.max_turns` o en caliente con `/turns <n>`; por defecto 200).
 - `config.py` — config persistente en `~/.giar/config.json` (o `$GIAR_HOME`).
   Guardado **atómico** (tmp + `os.replace`, permisos `0600`); si el fichero
   está corrupto se respalda como `config.json.corrupt-<fecha>` sin perderlo.
@@ -67,6 +78,15 @@ mensajes son en **español**.
 - El chat detecta salidas degeneradas del modelo (cadenas de `...` o repetición
   excesiva) con `_is_degenerate()` y reintenta el turno hasta
   `MAX_DEGENERATE_RETRIES` veces sin guardar la respuesta basura en el historial.
+- Atajos de la TUI: `Enter` envía, `Ctrl+C` interrumpe el turno en curso (o
+  limpia el input si está ocioso), `Ctrl+D` sale, `Ctrl+L` limpia la pantalla y
+  vuelve a mostrar el estado, `↑`/`↓` historial, `AvPág`/`RePág`/rueda scroll.
+  `Ctrl+L` lo captura por defecto `_default_bindings` de prompt_toolkit
+  (clear_screen, sin efecto visible); por eso se redefine en el control del
+  input (`input_area.control.key_bindings`), que tiene prioridad sobre la app.
+- El estado inicial (`_print_status`) se emite como un único bloque contiguo
+  (sin líneas en blanco entre cada dato) con la línea de ayuda final en
+  `bright_green`; es lo que se vuelve a mostrar tras `Ctrl+L`/`/clear`.
 - El venv de desarrollo puede vivir dentro de `giar/` (ver `.gitignore`:
   `giar/bin/`, `giar/lib/`…); solo se trackean los fuentes `giar/*.py`.
 - `README.md` documenta todos los comandos de la CLI y del chat; mantenerlo

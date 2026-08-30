@@ -27,8 +27,11 @@ herramientas directamente desde la terminal.
   (negritas, listas, bloques de código…).
 - **Modelos razonadores**: soporta `reasoning_effort` y muestra el pensamiento
   (`reasoning_content`) en un bloque atenuado, con opción de verlo u ocultarlo.
-- Interfaz interactiva estilo Claude Code: streaming, tool calls visibles,
-  historial, comandos `/`, `Ctrl+L` y `/clear` vuelven a mostrar el logo.
+- Interfaz interactiva estilo Claude Code con **logo de GIAR siempre visible**:
+  la sesión se abre en pantalla completa con el logo fijo arriba y la
+  conversación debajo, con scroll automático al final y lectura hacia atrás
+  (`AvPág`/`RePág` o rueda del ratón). Streaming, tool calls visibles,
+  historial y comandos `/`.
 
 ## Instalación
 
@@ -94,7 +97,7 @@ giar mcp add otro http://localhost:3000/mcp --header "X-API-Key: abc"
 /effort <nivel>   Reasoning effort: low | medium | high | off
 /reasoning on|off Mostrar/ocultar el pensamiento del modelo
 /turns <n>        Límite de turnos de herramientas por mensaje
-/clear            Reinicia la conversación y vuelve a mostrar el logo
+/clear            Reinicia la conversación (el logo queda fijo arriba)
 /skills           Ver skills detectados
 /tools            Ver herramientas disponibles
 /mcp              Estado de servidores MCP
@@ -115,8 +118,11 @@ distancia, para luego parar.
   `/turns <n>`).
 - `Ctrl+C` interrumpe el turno en curso si quieres detener la secuencia.
 
-`Ctrl+L` limpia la pantalla y vuelve a mostrar el banner de GIAR (igual que
-`/clear`).
+`Ctrl+L` limpia la pantalla y vuelve a mostrar el estado. `/clear` reinicia la
+conversación. En la sesión interactiva el logo de
+GIAR queda **fijo arriba** (pantalla completa); la conversación se desplaza por
+debajo y sigue el final automáticamente. Para volver atrás usa `AvPág`/`RePág`
+o la rueda del ratón.
 
 ## Modelos razonadores
 
